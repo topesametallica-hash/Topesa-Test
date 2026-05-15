@@ -16,6 +16,7 @@ const demoState = {
   ],
 };
 let apiAvailable = true;
+let isCommandInFlight = false;
 
 function setStatus(message) {
   statusText.textContent = message;
@@ -85,6 +86,7 @@ async function toggleRelay(relayId) {
     return;
   }
 
+  isCommandInFlight = true;
   tile.classList.add("is-busy");
   try {
     renderState(
@@ -99,6 +101,7 @@ async function toggleRelay(relayId) {
     setStatus("Relay command failed");
   } finally {
     tile.classList.remove("is-busy");
+    isCommandInFlight = false;
   }
 }
 
@@ -112,6 +115,7 @@ allOffButton.addEventListener("click", async () => {
     return;
   }
 
+  isCommandInFlight = true;
   allOffButton.disabled = true;
   try {
     renderState(await requestJson("/api/all-off", { method: "POST" }));
@@ -120,9 +124,15 @@ allOffButton.addEventListener("click", async () => {
     setStatus("All off command failed");
   } finally {
     allOffButton.disabled = false;
+    isCommandInFlight = false;
   }
 });
 
 updateClock();
 setInterval(updateClock, 1000);
 loadState();
+setInterval(() => {
+  if (apiAvailable && !isCommandInFlight) {
+    loadState();
+  }
+}, 1500);
