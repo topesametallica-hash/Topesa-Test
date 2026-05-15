@@ -1,0 +1,28 @@
+{
+  "relays": [
+    {
+      "name": "Light",
+      "pin": 17,
+      "active_low": true,
+      "initial_on": false
+    },
+    {
+      "name": "Pump",
+      "pin": 27,
+      "active_low": true,
+      "initial_on": false
+    },
+    {
+      "name": "Fan",
+      "pin": 22,
+      "active_low": true,
+      "initial_on": false
+    },
+    {
+      "name": "Spare",
+      "pin": 23,
+      "active_low": true,
+      "initial_on": false
+    }
+  ]
+}
