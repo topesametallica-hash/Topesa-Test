@@ -1,0 +1,10 @@
+{
+  "name": "raspberry-pi-relay-web-app-static",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node build-preview.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
