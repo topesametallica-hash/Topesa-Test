@@ -34,6 +34,16 @@ Custom port:
 RELAY_PORT=8080 python web_app/server.py
 ```
 
+Optional Supabase sync:
+
+```bash
+SUPABASE_URL=https://YOUR_PROJECT.supabase.co \
+SUPABASE_ANON_KEY=YOUR_ANON_KEY \
+python web_app/server.py
+```
+
+Relay state is stored in the `relay_states` table when Supabase variables are set.
+
 ## Desktop prototype
 
 Touchscreen-friendly Python/Kivy app for controlling GPIO relay modules on Raspberry Pi.
