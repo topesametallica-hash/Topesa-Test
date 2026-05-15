@@ -1,4 +1,40 @@
-# Raspberry Pi Relay Touchscreen App
+# Raspberry Pi Relay Control
+
+This project contains a browser-based relay controller and the first desktop/touchscreen prototype.
+
+## Web app
+
+Run the web version on Raspberry Pi:
+
+```bash
+python web_app/server.py
+```
+
+Then open:
+
+```text
+http://localhost:5000
+```
+
+On another device in the same Wi-Fi network, open the Raspberry Pi IP address:
+
+```text
+http://RASPBERRY_PI_IP:5000
+```
+
+Demo mode without GPIO:
+
+```bash
+RELAY_DEMO=1 python web_app/server.py
+```
+
+Custom port:
+
+```bash
+RELAY_PORT=8080 python web_app/server.py
+```
+
+## Desktop prototype
 
 Touchscreen-friendly Python/Kivy app for controlling GPIO relay modules on Raspberry Pi.
 
