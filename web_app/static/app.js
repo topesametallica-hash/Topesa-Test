@@ -6,6 +6,16 @@ const modePill = document.querySelector("#modePill");
 const allOffButton = document.querySelector("#allOffButton");
 
 const tiles = new Map();
+const demoState = {
+  mode: "demo",
+  relays: [
+    { id: "relay-1", name: "Light", pin: 17, on: false },
+    { id: "relay-2", name: "Pump", pin: 27, on: false },
+    { id: "relay-3", name: "Fan", pin: 22, on: false },
+    { id: "relay-4", name: "Spare", pin: 23, on: false },
+  ],
+};
+let apiAvailable = true;
 
 function setStatus(message) {
   statusText.textContent = message;
@@ -58,13 +68,23 @@ async function loadState() {
     renderState(await requestJson("/api/state"));
     setStatus("Ready");
   } catch (error) {
-    setStatus("Cannot connect to relay server");
+    apiAvailable = false;
+    renderState(demoState);
+    setStatus("Demo preview ready");
   }
 }
 
 async function toggleRelay(relayId) {
   const tile = tiles.get(relayId);
   const next = tile.dataset.on !== "1";
+  if (!apiAvailable) {
+    const relay = demoState.relays.find((item) => item.id === relayId);
+    relay.on = next;
+    renderState(demoState);
+    setStatus(`${relay.name} set to ${next ? "ON" : "OFF"}`);
+    return;
+  }
+
   tile.classList.add("is-busy");
   try {
     renderState(
@@ -83,6 +103,15 @@ async function toggleRelay(relayId) {
 }
 
 allOffButton.addEventListener("click", async () => {
+  if (!apiAvailable) {
+    demoState.relays.forEach((relay) => {
+      relay.on = false;
+    });
+    renderState(demoState);
+    setStatus("All relays are OFF");
+    return;
+  }
+
   allOffButton.disabled = true;
   try {
     renderState(await requestJson("/api/all-off", { method: "POST" }));
