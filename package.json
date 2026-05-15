@@ -4,5 +4,7 @@
   "private": true,
   "scripts": {
     "build": "node build-preview.mjs"
-  }
+  },
+  "dependencies": {},
+  "devDependencies": {}
 }
