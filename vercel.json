@@ -1,12 +1,14 @@
 {
+  "buildCommand": null,
+  "outputDirectory": "web-preview",
   "rewrites": [
     {
       "source": "/",
-      "destination": "/web-preview/index.html"
+      "destination": "/index.html"
     },
     {
       "source": "/:path*",
-      "destination": "/web-preview/:path*"
+      "destination": "/:path*"
     }
   ]
 }
