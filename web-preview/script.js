@@ -1,76 +1,93 @@
-const relayTiles = [...document.querySelectorAll(".relay-tile")];
-const allOffButton = document.querySelector("#allOffButton");
-const statusText = document.querySelector("#statusText");
+const relayTiles = [...document.querySelectorAll('.relay-tile')];
+const allOffButton = document.querySelector('#allOffButton');
+const statusText = document.querySelector('#statusText');
 
-const relayState = {};
-const API_URL = "/api/relays";
+const SUPABASE_URL = 'https://jbvqrzidxhfihqlpbryq.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Ucz350hs8Df0_CwQq2mRfw_jz-9qSbM';
+
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 function updateTile(tile, enabled) {
-  tile.classList.toggle("is-on", enabled);
-  tile.querySelector(".relay-state").textContent = enabled ? "ON" : "OFF";
+  tile.classList.toggle('is-on', enabled);
+  tile.querySelector('.relay-state').textContent = enabled ? 'ON' : 'OFF';
 }
 
-function syncRelayTiles() {
-  relayTiles.forEach((tile) => {
-    const relayName = tile.dataset.relay;
-    const enabled = relayState[relayName] || false;
+async function loadRelayState() {
+  const { data, error } = await supabaseClient
+    .from('relay_state')
+    .select('*');
 
-    updateTile(tile, enabled);
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  data.forEach((relay) => {
+    const tile = document.querySelector(`[data-relay="${relay.relay_name}"]`);
+
+    if (tile) {
+      updateTile(tile, relay.enabled);
+    }
   });
 }
 
-async function fetchRelayState() {
-  try {
-    const response = await fetch(API_URL);
-    const data = await response.json();
-
-    Object.assign(relayState, data);
-
-    syncRelayTiles();
-  } catch (error) {
-    console.error("Failed to fetch relay state", error);
-  }
-}
-
-async function pushRelayState() {
-  try {
-    await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(relayState),
+async function setRelayState(relayName, enabled) {
+  const { error } = await supabaseClient
+    .from('relay_state')
+    .upsert({
+      relay_name: relayName,
+      enabled,
     });
-  } catch (error) {
-    console.error("Failed to push relay state", error);
+
+  if (error) {
+    console.error(error);
   }
 }
 
 relayTiles.forEach((tile) => {
-  tile.addEventListener("click", async () => {
-    const relayName = tile.dataset.relay;
-    const enabled = !tile.classList.contains("is-on");
-
-    relayState[relayName] = enabled;
+  tile.addEventListener('click', async () => {
+    const enabled = !tile.classList.contains('is-on');
 
     updateTile(tile, enabled);
 
-    await pushRelayState();
+    await setRelayState(tile.dataset.relay, enabled);
 
-    statusText.textContent = `${relayName} set to ${enabled ? "ON" : "OFF"}`;
+    statusText.textContent = `${tile.dataset.relay} set to ${enabled ? 'ON' : 'OFF'}`;
   });
 });
 
-allOffButton.addEventListener("click", async () => {
-  relayTiles.forEach((tile) => {
-    relayState[tile.dataset.relay] = false;
+allOffButton.addEventListener('click', async () => {
+  for (const tile of relayTiles) {
     updateTile(tile, false);
-  });
+    await setRelayState(tile.dataset.relay, false);
+  }
 
-  await pushRelayState();
-
-  statusText.textContent = "All relays are OFF";
+  statusText.textContent = 'All relays are OFF';
 });
 
-fetchRelayState();
-setInterval(fetchRelayState, 1000);
+supabaseClient
+  .channel('relay-sync')
+  .on(
+    'postgres_changes',
+    {
+      event: '*',
+      schema: 'public',
+      table: 'relay_state',
+    },
+    (payload) => {
+      const relay = payload.new;
+
+      if (!relay) {
+        return;
+      }
+
+      const tile = document.querySelector(`[data-relay="${relay.relay_name}"]`);
+
+      if (tile) {
+        updateTile(tile, relay.enabled);
+      }
+    }
+  )
+  .subscribe();
+
+loadRelayState();
