@@ -4,7 +4,10 @@ import json
 import mimetypes
 import os
 import platform
+import urllib.error
+import urllib.request
 from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -16,6 +19,8 @@ STATIC_ROOT = ROOT / "static"
 CONFIG_PATH = ROOT.parent / "relays.json"
 HOST = os.environ.get("RELAY_HOST", "0.0.0.0")
 PORT = int(os.environ.get("RELAY_PORT", "5000"))
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 
 
 @dataclass(frozen=True)
@@ -47,6 +52,7 @@ class RelayBackend:
             except Exception as exc:
                 self.demo = True
                 print(f"GPIO unavailable, running in demo mode: {exc}")
+        self._seed_supabase()
 
     def snapshot(self) -> dict:
         return {
@@ -67,6 +73,7 @@ class RelayBackend:
             output_on = self._gpio.LOW if relay.active_low else self._gpio.HIGH
             output_off = self._gpio.HIGH if relay.active_low else self._gpio.LOW
             self._gpio.output(relay.pin, output_on if on else output_off)
+        self._save_supabase(relay, on)
         return self.snapshot()
 
     def all_off(self) -> dict:
@@ -84,6 +91,66 @@ class RelayBackend:
             if relay.id == relay_id:
                 return relay
         raise KeyError(f"Unknown relay: {relay_id}")
+
+    def _seed_supabase(self) -> None:
+        if not supabase_enabled():
+            return
+        for relay in self.relays:
+            self._save_supabase(relay, self.states[relay.id])
+
+    def _save_supabase(self, relay: RelayConfig, on: bool) -> None:
+        if not supabase_enabled():
+            return
+        payload = {
+            "relay_id": relay.id,
+            "name": relay.name,
+            "pin": relay.pin,
+            "is_on": on,
+            "updated_at": datetime.now(UTC).isoformat(),
+        }
+        try:
+            supabase_request(
+                "/rest/v1/relay_states?on_conflict=relay_id",
+                method="POST",
+                payload=payload,
+                extra_headers={
+                    "Prefer": "resolution=merge-duplicates",
+                },
+            )
+        except Exception as exc:
+            print(f"Supabase sync failed for {relay.id}: {exc}")
+
+
+def supabase_enabled() -> bool:
+    return bool(SUPABASE_URL and SUPABASE_ANON_KEY)
+
+
+def supabase_request(
+    path: str,
+    method: str = "GET",
+    payload: dict | None = None,
+    extra_headers: dict[str, str] | None = None,
+) -> bytes:
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    headers = {
+        "apikey": SUPABASE_ANON_KEY,
+        "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
+        "Content-Type": "application/json",
+    }
+    if extra_headers:
+        headers.update(extra_headers)
+    request = urllib.request.Request(
+        f"{SUPABASE_URL}{path}",
+        data=data,
+        headers=headers,
+        method=method,
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=6) as response:
+            return response.read()
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Supabase HTTP {exc.code}: {body}") from exc
 
 
 def load_relays() -> list[RelayConfig]:
