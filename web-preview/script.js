@@ -3,12 +3,11 @@ const allOffButton = document.querySelector("#allOffButton");
 const statusText = document.querySelector("#statusText");
 
 const relayState = {};
+const API_URL = "/api/relays";
 
-function setRelay(tile, enabled) {
+function updateTile(tile, enabled) {
   tile.classList.toggle("is-on", enabled);
   tile.querySelector(".relay-state").textContent = enabled ? "ON" : "OFF";
-
-  relayState[tile.dataset.relay] = enabled;
 }
 
 function syncRelayTiles() {
@@ -16,69 +15,62 @@ function syncRelayTiles() {
     const relayName = tile.dataset.relay;
     const enabled = relayState[relayName] || false;
 
-    tile.classList.toggle("is-on", enabled);
-    tile.querySelector(".relay-state").textContent = enabled ? "ON" : "OFF";
+    updateTile(tile, enabled);
   });
 }
 
-function broadcastRelayUpdate(relayName, enabled) {
-  relayState[relayName] = enabled;
-
-  localStorage.setItem(
-    "relay-sync-state",
-    JSON.stringify({
-      relayState,
-      updatedAt: Date.now(),
-    })
-  );
-}
-
-function loadRelayState() {
-  const saved = localStorage.getItem("relay-sync-state");
-
-  if (!saved) {
-    return;
-  }
-
+async function fetchRelayState() {
   try {
-    const parsed = JSON.parse(saved);
+    const response = await fetch(API_URL);
+    const data = await response.json();
 
-    Object.assign(relayState, parsed.relayState || {});
+    Object.assign(relayState, data);
 
     syncRelayTiles();
   } catch (error) {
-    console.error("Failed to load relay state", error);
+    console.error("Failed to fetch relay state", error);
+  }
+}
+
+async function pushRelayState() {
+  try {
+    await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(relayState),
+    });
+  } catch (error) {
+    console.error("Failed to push relay state", error);
   }
 }
 
 relayTiles.forEach((tile) => {
-  tile.addEventListener("click", () => {
+  tile.addEventListener("click", async () => {
+    const relayName = tile.dataset.relay;
     const enabled = !tile.classList.contains("is-on");
 
-    setRelay(tile, enabled);
-    broadcastRelayUpdate(tile.dataset.relay, enabled);
+    relayState[relayName] = enabled;
 
-    statusText.textContent = `${tile.dataset.relay} set to ${enabled ? "ON" : "OFF"}`;
+    updateTile(tile, enabled);
+
+    await pushRelayState();
+
+    statusText.textContent = `${relayName} set to ${enabled ? "ON" : "OFF"}`;
   });
 });
 
-allOffButton.addEventListener("click", () => {
+allOffButton.addEventListener("click", async () => {
   relayTiles.forEach((tile) => {
-    setRelay(tile, false);
-    broadcastRelayUpdate(tile.dataset.relay, false);
+    relayState[tile.dataset.relay] = false;
+    updateTile(tile, false);
   });
+
+  await pushRelayState();
 
   statusText.textContent = "All relays are OFF";
 });
 
-window.addEventListener("storage", (event) => {
-  if (event.key !== "relay-sync-state") {
-    return;
-  }
-
-  loadRelayState();
-});
-
-loadRelayState();
-
-setInterval(loadRelayState, 1000);
+fetchRelayState();
+setInterval(fetchRelayState, 1000);
