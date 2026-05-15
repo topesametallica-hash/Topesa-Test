@@ -1,0 +1,8 @@
+{
+  "name": "raspberry-pi-relay-preview",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node build-preview.mjs"
+  }
+}
